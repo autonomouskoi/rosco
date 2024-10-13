@@ -1,0 +1,94 @@
+syntax = "proto3";
+package rosco;
+
+option go_package = "github.com/autonomouskoi/rosco";
+
+enum BusTopic {
+    ROSCO_EVENT   = 0;
+    ROSCO_REQUEST = 1;
+    ROSCO_COMMAND = 2;
+}
+
+message Target {
+    string  name    = 1;
+    string  address = 2;
+    uint32  port    = 3;
+}
+
+message Config {
+    map<int32, Target>  targets = 1;
+    map<int32, Script>  scripts = 2;
+}
+
+enum MessageTypeRequest {
+    CONFIG_GET_REQ    = 0;
+    CONFIG_GET_RESP   = 1;
+    MESSAGE_SEND_REQ  = 2;
+    MESSAGE_SEND_RESP = 3;
+    SCRIPT_RUN_REQ    = 4;
+    SCRIPT_RUN_RESP   = 5;
+}
+
+message ConfigGetRequest {}
+message ConfigGetResponse {
+    Config  config = 1;
+}
+
+message OSCValue {
+    oneof   value {
+        int32    nil      = 1;
+        int32    int32    = 2;
+        float    float32  = 3;
+        string   string   = 4;
+        bytes    blob     = 5;
+        int64    int64    = 6;
+        //int64    time     = 7;
+        //int64    double   = 8;
+        bool     true     = 9;
+        bool     false    = 10;
+    }
+}
+
+message SendMessageRequest {
+             int32     target  = 1;
+             string    address = 2;
+    repeated OSCValue  values  = 3;
+}
+message SendMessageResponse {}
+
+enum MessageTypeCommand {
+    CONFIG_SET_REQ  = 0;
+    CONFIG_SET_RESP = 1;
+}
+
+message ConfigSetRequest {
+    Config config = 1;
+}
+message ConfigSetResponse {
+    Config config = 1;
+}
+
+enum ScriptActionType {
+    ActionTypeSet   = 0;
+    ActionTypeFade  = 1;
+    ActionTypeSleep = 2;
+}
+
+message ScriptAction {
+             ScriptActionType  type        = 1;
+             string            address     = 2;
+    repeated OSCValue          values      = 3;
+             uint32            duration_ms = 4;
+}
+
+message Script {
+             string        name    = 1;
+    repeated ScriptAction  actions = 2;
+}
+
+message ScriptRunRequest {
+    int32   target    = 1;
+    Script  script    = 2;
+    int32   script_id = 3; 
+}
+message ScriptRunResponse {}
