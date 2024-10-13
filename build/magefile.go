@@ -77,7 +77,7 @@ func WebDir() error {
 
 func WebSrcCopy() error {
 	mg.Deps(WebDir)
-	filenames := []string{"index.html"}
+	filenames := []string{"index.html", "blockly.js"}
 	if err := mageutil.CopyInDir(webDir, baseDir, filenames...); err != nil {
 		return fmt.Errorf("copying: %w", err)
 	}
