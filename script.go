@@ -11,7 +11,6 @@ import (
 )
 
 func (rsc *Rosco) handleRequestRunScript(msg *bus.BusMessage) *bus.BusMessage {
-	rsc.Log.Debug("handling run script")
 	reply := &bus.BusMessage{
 		Topic: msg.GetTopic(),
 		Type:  msg.Type + 1,
@@ -74,6 +73,7 @@ func (rsc *Rosco) sendMessage(targetID int32, msgble messageable) *bus.Error {
 	client := rsc.clients[targetID]
 	rsc.lock.Unlock()
 	if client == nil {
+		rsc.Log.Error("invalid target", "target_id", targetID)
 		return &bus.Error{
 			Code:   int32(bus.CommonErrorCode_INVALID_TYPE),
 			Detail: proto.String(fmt.Sprintf("invalid target: %d", targetID)),
@@ -109,7 +109,6 @@ func (rsc *Rosco) sendMessage(targetID int32, msgble messageable) *bus.Error {
 		}
 		oscMsg.Append(value)
 	}
-	rsc.Log.Debug("sending osc", "host", client.IP(), "osc", *oscMsg)
 	if err := client.Send(oscMsg); err != nil {
 		rsc.Log.Error("sending osc",
 			"host", client.IP(),
@@ -153,6 +152,7 @@ func (rsc *Rosco) fade(targetID int32, action *ScriptAction) *bus.Error {
 		if busErr := rsc.sendMessage(targetID, sa); busErr != nil {
 			return busErr
 		}
+		time.Sleep(timeSlice)
 	}
 
 	return nil
