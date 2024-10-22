@@ -7,13 +7,13 @@ import { Controller } from './controller.js';
 Blockly.common.defineBlocks(blocks.blocks);
 
 class ScriptEditor extends HTMLElement {
-    private _mainContainer: HTMLElement;
-    private _ctrl: Controller; 
+    private _blocklyDiv: HTMLElement;
+    private _ctrl: Controller;
     private _editingID: number;
 
-    constructor(mainContainer: HTMLElement, ctrl: Controller) {
+    constructor(blocklyDiv: HTMLElement, ctrl: Controller) {
         super();
-        this._mainContainer = mainContainer;
+        this._blocklyDiv = blocklyDiv;
         this._ctrl = ctrl;
         ctrl.scriptEdit.subscribe((script) => {
             if (script.v !== undefined) {
@@ -28,11 +28,36 @@ class ScriptEditor extends HTMLElement {
     }
 
     private _setScript(script: roscopb.Script) {
-        this._mainContainer.textContent = '';
-        const ws = Blockly.inject(this._mainContainer, {
+        const blocklyArea = document.getElementById('blocklyArea');
+        this._blocklyDiv.textContent = '';
+        const ws = Blockly.inject(this._blocklyDiv, {
             collapse: true,
+            move: {
+                scrollbars: {
+                    vertical: true,
+                },
+            },
             toolbox: blocks.toolbox,
         });
+        let onresize = () => {
+            // Compute the absolute coordinates and dimensions of blocklyArea.
+            let element = blocklyArea;
+            let x = 0;
+            let y = 0;
+            do {
+                x += element.offsetLeft;
+                y += element.offsetTop;
+                element = element.offsetParent as HTMLElement;
+            } while (element);
+            // Position blocklyDiv over blocklyArea.
+            this._blocklyDiv.style.left = x + 'px';
+            this._blocklyDiv.style.top = y + 'px';
+            this._blocklyDiv.style.width = blocklyArea.offsetWidth + 'px';
+            this._blocklyDiv.style.height = blocklyArea.offsetHeight + 'px';
+            Blockly.svgResize(ws);
+        };
+        window.addEventListener('resize', onresize, false);
+        onresize();
 
         ws.registerButtonCallback(blocks.CALLBACK_KEY_CANCEL, () => {
             this._cancelEdit();
@@ -47,7 +72,7 @@ class ScriptEditor extends HTMLElement {
                 this._ctrl.scripts.save(scripts)
                     .then(() => this._cancelEdit());
             } catch (e) {
-                console.log(`error generating script proto: `+e);
+                console.log(`error generating script proto: ` + e);
             }
         });
         ws.registerButtonCallback(blocks.CALLBACK_KEY_RUN, () => {
@@ -56,7 +81,7 @@ class ScriptEditor extends HTMLElement {
                 let script = roscopb.Script.fromJsonString(json);
                 this._ctrl.runScript(script);
             } catch (e) {
-                console.log(`error generating script proto: `+e);
+                console.log(`error generating script proto: ` + e);
             }
 
         });

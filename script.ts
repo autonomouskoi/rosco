@@ -24,9 +24,9 @@ class Scripts extends HTMLElement {
 
 <fieldset>
 <legend>Scripts</legend>
-<div id="scripts">
-</div>
-<button id="btn-new"> + </button>
+<div id="scripts"></div>
+<button id="btn-new">New</button>
+<button id="btn-import">Import</button>
 </fieldset>
 `;
         this._ctrl = ctrl;
@@ -34,6 +34,12 @@ class Scripts extends HTMLElement {
         this._button_new.addEventListener('click', () => this._onNew());
 
         this._div_scripts = this.shadowRoot.querySelector('#scripts');
+
+        let dialogImport = new ImportDialog(ctrl);
+        this.shadowRoot.appendChild(dialogImport);
+
+        let buttonImport = this.shadowRoot.querySelector('#btn-import');
+        buttonImport.addEventListener('click', () => dialogImport.showModal());
 
         this._ctrl.scripts.subscribe((scripts) => { this._updateScripts(scripts) });
     }
@@ -65,6 +71,7 @@ class Scripts extends HTMLElement {
             this._ctrl.scriptEdit.update({ id, v: script });
         });
         buttonsDiv.appendChild(editButton);
+
         let deleteButton = document.createElement('button') as HTMLButtonElement;
         deleteButton.innerText = 'Delete';
         deleteButton.addEventListener('click', () => {
@@ -74,12 +81,28 @@ class Scripts extends HTMLElement {
                 this._ctrl.scripts.save(scripts);
             }
         });
+        buttonsDiv.appendChild(deleteButton);
+
         let runButton = document.createElement('button') as HTMLButtonElement;
         runButton.innerText = 'Run';
         runButton.addEventListener('click', () => {
             this._ctrl.runScript(id);
         });
-        buttonsDiv.appendChild(deleteButton);
+        buttonsDiv.appendChild(runButton);
+
+        let exportButton = document.createElement('button') as HTMLButtonElement;
+        exportButton.innerText = 'Export';
+        exportButton.addEventListener('click', () => {
+            if (!navigator.clipboard) {
+                return;
+            }
+            navigator.clipboard.writeText(script.toJsonString()).then(() => {
+                exportButton.innerText = 'Copied to Clipboard!';
+                setTimeout(() => {exportButton.innerText = 'Export'}, 5000);
+            });
+        });
+        buttonsDiv.appendChild(exportButton);
+
         this._div_scripts.appendChild(buttonsDiv);
     }
 
@@ -93,5 +116,62 @@ class Scripts extends HTMLElement {
     }
 }
 customElements.define('rosco-scripts-unused', Scripts);
+
+class ImportDialog extends HTMLElement {
+    private _dialog: HTMLDialogElement;
+    private _textarea: HTMLTextAreaElement;
+    private _btn_cancel: HTMLButtonElement;
+    private _btn_import: HTMLButtonElement;
+
+    private _ctrl: Controller;
+
+    constructor(ctrl: Controller) {
+        super();
+
+        this.innerHTML = `
+<dialog>
+<h1>Import Script</h1>
+    <textarea
+        rows="10"
+        cols="60"
+    ></textarea>
+    <div>
+    <button id="import">Import</button>
+    <button id="cancel">Cancel</button>
+    </div>
+<dialog>
+`;
+
+        this._dialog = this.querySelector('dialog');
+        this._textarea = this.querySelector('textarea');
+        this._btn_cancel = this.querySelector('#cancel');
+        this._btn_cancel.addEventListener('click', () => this._cancel());
+        this._btn_import = this.querySelector('#import');
+        this._btn_import.addEventListener('click', () => this._import());
+        this._ctrl = ctrl;
+    }
+
+    private _cancel() {
+        this._textarea.value = '';
+        this._dialog.close();
+    }
+    
+    private _import() {
+        let script: roscopb.Script
+        try {
+            script = roscopb.Script.fromJsonString(this._textarea.value);
+        } catch (e) {
+            alert('invalid script');
+            return;
+        }
+        this._cancel();
+        this._ctrl.scriptEdit.update({ id: 0, v: script });
+    }
+
+    showModal() {
+        this._dialog.showModal();
+    }
+}
+customElements.define('rosco-import-dialog-unused', ImportDialog);
 
 export { Scripts };

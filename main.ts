@@ -1,22 +1,21 @@
 import { bus, enumName } from "/bus.js";
-import * as buspb from "/pb/bus/bus_pb.js";
-import * as roscopb from "/m/rosco/pb/rosco_pb.js";
 import * as scripts from "./script.js";
 import * as sender from "./sender.js";
 import * as target from "./target.js";
 import { ScriptEditor } from "./bscript.js";
 import { Controller } from "./controller.js";
 
-const TOPIC_REQUEST = enumName(roscopb.BusTopic, roscopb.BusTopic.ROSCO_REQUEST);
-
 function start(mainContainer: HTMLElement) {
     document.querySelector("title").innerText = 'Rosco';
     let ctrl = new Controller();
 
-    let blockly = document.createElement('div') as HTMLDivElement;
-    blockly.style.setProperty('width', '800px');
-    blockly.style.setProperty('height', '460px');
-    new ScriptEditor(blockly, ctrl);
+    let blocklyDiv = document.createElement('div') as HTMLDivElement;
+    blocklyDiv.id = 'blocklyDiv';
+    blocklyDiv.style.setProperty('position', 'absolute');
+    let blocklyArea = document.createElement('div') as HTMLDivElement;
+    blocklyArea.id = 'blocklyArea';
+    blocklyArea.style.setProperty('height', '100vh');
+    new ScriptEditor(blocklyDiv, ctrl);
 
     let scriptsContainer = document.createElement('div') as HTMLDivElement;
     scriptsContainer.style.setProperty('z-index', '1000');
@@ -37,7 +36,8 @@ function start(mainContainer: HTMLElement) {
     scriptsContainer.appendChild(scriptsElem);
 
     ctrl.ready().then(() => {
-        mainContainer.appendChild(blockly);
+        mainContainer.appendChild(blocklyArea);
+        mainContainer.appendChild(blocklyDiv);
         mainContainer.appendChild(scriptsContainer);
     });
 }

@@ -1,7 +1,6 @@
 import { bus, enumName } from "/bus.js";
 import * as buspb from "/pb/bus/bus_pb.js";
 import * as roscopb from "/m/rosco/pb/rosco_pb.js";
-import { ScriptEditor } from "./bscript.js";
 
 const TOPIC_REQUEST = enumName(roscopb.BusTopic, roscopb.BusTopic.ROSCO_REQUEST);
 const TOPIC_COMMAND = enumName(roscopb.BusTopic, roscopb.BusTopic.ROSCO_COMMAND);
