@@ -41,7 +41,7 @@ func init() {
 			},
 			{
 				Path:        "/m/rosco",
-				Type:        modules.ManifestWebPathType_MANIFEST_WEB_PATH_TYPE_EMBED_CONTROL,
+				Type:        modules.ManifestWebPathType_MANIFEST_WEB_PATH_TYPE_CONTROL_PAGE,
 				Description: "Controls for Rosco",
 			},
 		},
