@@ -82,7 +82,7 @@ func (rsc *Rosco) Start(ctx context.Context, deps *modutil.ModuleDeps) error {
 	if err != nil {
 		return fmt.Errorf("get web FS %w", err)
 	}
-	rsc.Handler = http.StripPrefix("/m/rosco", http.FileServer(fs))
+	rsc.Handler = http.FileServer(fs)
 
 	eg := errgroup.Group{}
 	eg.Go(func() error { return rsc.handleRequests(ctx) })
