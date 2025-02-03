@@ -31,6 +31,7 @@ var (
 func init() {
 	manifest := &modules.Manifest{
 		Id:          "26f36f67f6931ed9",
+		Title:       "Rosco",
 		Name:        "rosco",
 		Description: "Open Sound Control integration",
 		WebPaths: []*modules.ManifestWebPath{
