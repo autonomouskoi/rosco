@@ -57,12 +57,12 @@ func Dev() {
 }
 
 func GoProtos() error {
-	return mageutil.GoProtosInDir(baseDir, "module=github.com/autonomouskoi/rosco")
+	return mageutil.GoProtosInDir(baseDir, baseDir, "module=github.com/autonomouskoi/rosco")
 }
 
 func TSProtos() error {
 	mg.Deps(WebDir)
-	return mageutil.TSProtosInDir(webDir, baseDir)
+	return mageutil.TSProtosInDir(webDir, baseDir, filepath.Join(baseDir, "node_modules"))
 }
 
 func TS() error {
