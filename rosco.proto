@@ -9,22 +9,14 @@ enum BusTopic {
     ROSCO_COMMAND = 2;
 }
 
-message Target {
-    string  name    = 1;
-    string  address = 2;
-    uint32  port    = 3;
-}
-
 message Config {
-    map<int32, Target>  targets = 1;
-    map<int32, Script>  scripts = 2;
+    map<int32, Script>    scripts  = 1;
+    map<string, Trigger>  triggers = 2;
 }
 
 enum MessageTypeRequest {
     CONFIG_GET_REQ    = 0;
     CONFIG_GET_RESP   = 1;
-    MESSAGE_SEND_REQ  = 2;
-    MESSAGE_SEND_RESP = 3;
     SCRIPT_RUN_REQ    = 4;
     SCRIPT_RUN_RESP   = 5;
 }
@@ -48,13 +40,6 @@ message OSCValue {
         bool     false    = 10;
     }
 }
-
-message SendMessageRequest {
-             int32     target  = 1;
-             string    address = 2;
-    repeated OSCValue  values  = 3;
-}
-message SendMessageResponse {}
 
 enum MessageTypeCommand {
     CONFIG_SET_REQ  = 0;
@@ -87,8 +72,13 @@ message Script {
 }
 
 message ScriptRunRequest {
-    int32   target    = 1;
+    string  target    = 1;
     Script  script    = 2;
     int32   script_id = 3; 
 }
 message ScriptRunResponse {}
+
+message Trigger {
+    string  target    = 1;
+    int32   script_id = 2;
+}

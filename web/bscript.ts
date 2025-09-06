@@ -2,29 +2,22 @@ import * as Blockly from 'blockly';
 import * as blocks from './bscript_blocks.js';
 
 import * as roscopb from '/m/rosco/pb/rosco_pb.js';
-import { Controller } from './controller.js';
+import { EVENT_RUN, EVENT_UPDATE } from './script_edit.js';
 
 Blockly.common.defineBlocks(blocks.blocks);
 
 class ScriptEditor extends HTMLElement {
     private _blocklyDiv: HTMLElement;
-    private _ctrl: Controller;
-    private _editingID: number;
 
-    constructor(blocklyDiv: HTMLElement, ctrl: Controller) {
+    constructor(blocklyDiv: HTMLElement) {
         super();
         this._blocklyDiv = blocklyDiv;
-        this._ctrl = ctrl;
-        ctrl.scriptEdit.subscribe((script) => {
-            if (script.v !== undefined) {
-                this._setScript(script.v);
-                this._editingID = script.id;
-            }
-        });
+        let script = roscopb.Script.fromJsonString(atob(window.location.hash.slice(1)));
+        this._setScript(script);
     }
 
     private _cancelEdit() {
-        this._ctrl.scriptEdit.update({ id: 0, v: undefined });
+        window.close();
     }
 
     private _setScript(script: roscopb.Script) {
@@ -66,11 +59,9 @@ class ScriptEditor extends HTMLElement {
             let json = blocks.generator.workspaceToCode(ws);
             try {
                 let script = roscopb.Script.fromJsonString(json);
-                let id = this._editingID ? this._editingID : Math.floor(Math.random() * 0xffff);
-                let scripts = this._ctrl.scripts.last;
-                scripts[id] = script;
-                this._ctrl.scripts.save(scripts)
-                    .then(() => this._cancelEdit());
+                window.dispatchEvent(new CustomEvent(EVENT_UPDATE, {
+                    detail: script,
+                }));
             } catch (e) {
                 console.log(`error generating script proto: ` + e);
             }
@@ -79,11 +70,12 @@ class ScriptEditor extends HTMLElement {
             let json = blocks.generator.workspaceToCode(ws);
             try {
                 let script = roscopb.Script.fromJsonString(json);
-                this._ctrl.runScript(script);
+                window.dispatchEvent(new CustomEvent(EVENT_RUN, {
+                    detail: script,
+                }));
             } catch (e) {
                 console.log(`error generating script proto: ` + e);
             }
-
         });
 
         let scriptB = createScript(ws, script);

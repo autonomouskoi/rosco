@@ -1,0 +1,308 @@
+package rosco
+
+import (
+	"context"
+	_ "embed"
+	"errors"
+	"fmt"
+	"math/rand"
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/hypebeast/go-osc/osc"
+	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/autonomouskoi/akcore"
+	"github.com/autonomouskoi/akcore/bus"
+	"github.com/autonomouskoi/akcore/modules/modutil"
+	"github.com/autonomouskoi/akcore/storage/kv"
+	"github.com/autonomouskoi/akcore/web/webutil"
+	"github.com/autonomouskoi/core-tinygo/svc"
+)
+
+const (
+	envLocalContentPath = "AK_CONTENT_ROSCO"
+)
+
+type RoscOLD struct {
+	http.Handler
+	bus *bus.Bus
+	modutil.ModuleBase
+	lock    sync.Mutex
+	kv      kv.KVPrefix
+	cfg     *Config
+	clients map[int32]*osc.Client
+}
+
+func (rsc *RoscOLD) Start(ctx context.Context, deps *modutil.ModuleDeps) error {
+	rsc.bus = deps.Bus
+	rsc.Log = deps.Log
+	rsc.kv = deps.KV
+	rsc.clients = map[int32]*osc.Client{}
+
+	if err := rsc.loadConfig(); err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+	defer rsc.writeCfg()
+
+	for id, host := range rsc.cfg.Targets {
+		rsc.clients[id] = osc.NewClient(host.Address, int(host.Port))
+	}
+	defer func() { rsc.clients = nil }()
+
+	fs, err := webutil.ZipOrEnvPath(envLocalContentPath, webZip)
+	if err != nil {
+		return fmt.Errorf("get web FS %w", err)
+	}
+	rsc.Handler = http.FileServer(fs)
+
+	eg := errgroup.Group{}
+	eg.Go(func() error { return rsc.handleRequests(ctx) })
+	eg.Go(func() error { return rsc.handleCommands(ctx) })
+
+	return eg.Wait()
+}
+
+func (rsc *RoscOLD) handleRequests(ctx context.Context) error {
+	rsc.bus.HandleTypes(ctx, BusTopic_ROSCO_REQUEST.String(), 8,
+		map[int32]bus.MessageHandler{
+			int32(MessageTypeRequest_CONFIG_GET_REQ):   rsc.handleRequestConfigGet,
+			int32(MessageTypeRequest_MESSAGE_SEND_REQ): rsc.handleRequestSendMessage,
+			int32(MessageTypeRequest_SCRIPT_RUN_REQ):   rsc.handleRequestRunScript,
+		},
+		nil,
+	)
+	return nil
+}
+
+func (rsc *RoscOLD) handleRequestConfigGet(msg *bus.BusMessage) *bus.BusMessage {
+	reply := &bus.BusMessage{
+		Topic: msg.GetTopic(),
+		Type:  msg.Type + 1,
+	}
+	rsc.lock.Lock()
+	rsc.MarshalMessage(reply, &ConfigGetResponse{
+		Config: rsc.cfg,
+	})
+	rsc.lock.Unlock()
+	return reply
+}
+
+func (rsc *RoscOLD) handleRequestSendMessage(msg *bus.BusMessage) *bus.BusMessage {
+	reply := &bus.BusMessage{
+		Topic: msg.GetTopic(),
+		Type:  msg.Type + 1,
+	}
+	smr := &SendMessageRequest{}
+	if reply.Error = rsc.UnmarshalMessage(msg, smr); reply.Error != nil {
+		return reply
+	}
+	if reply.Error = rsc.sendMessage(smr.Target, smr); reply.Error != nil {
+		return reply
+	}
+	rsc.MarshalMessage(reply, &SendMessageResponse{})
+	return reply
+}
+
+func (rsc *RoscOLD) handleCommands(ctx context.Context) error {
+	rsc.bus.HandleTypes(ctx, BusTopic_ROSCO_COMMAND.String(), 4,
+		map[int32]bus.MessageHandler{
+			int32(MessageTypeCommand_CONFIG_SET_REQ): rsc.handleCommandConfigSet,
+		},
+		nil,
+	)
+	return nil
+}
+
+func (rsc *RoscOLD) handleCommandConfigSet(msg *bus.BusMessage) *bus.BusMessage {
+	reply := &bus.BusMessage{
+		Topic: msg.GetTopic(),
+		Type:  msg.Type + 1,
+	}
+	csr := &ConfigSetRequest{}
+	if reply.Error = rsc.UnmarshalMessage(msg, csr); reply.Error != nil {
+		return reply
+	}
+	targets := make(map[int32]*Target, len(csr.Config.Targets))
+	for id, target := range csr.Config.Targets {
+		if id == 0 {
+			id = rand.Int31()
+		}
+		targets[id] = target
+	}
+	csr.Config.Targets = targets
+	rsc.lock.Lock()
+	rsc.cfg = csr.GetConfig()
+	rsc.lock.Unlock()
+	rsc.writeCfg()
+	rsc.MarshalMessage(reply, &ConfigSetResponse{
+		Config: rsc.cfg,
+	})
+	return reply
+}
+
+func (rsc *RoscOLD) loadConfig() error {
+	rsc.cfg = &Config{}
+	if err := rsc.kv.GetProto(cfgKVKey, rsc.cfg); err != nil && !errors.Is(err, akcore.ErrNotFound) {
+		return fmt.Errorf("retrieving config: %w", err)
+	}
+	return nil
+}
+
+func (rsc *RoscOLD) writeCfg() {
+	rsc.lock.Lock()
+	defer rsc.lock.Unlock()
+	if err := rsc.kv.SetProto(cfgKVKey, rsc.cfg); err != nil {
+		rsc.Log.Error("writing config", "error", err.Error())
+	}
+}
+
+func (rsc *RoscOLD) handleRequestRunScript(msg *bus.BusMessage) *bus.BusMessage {
+	reply := &bus.BusMessage{
+		Topic: msg.GetTopic(),
+		Type:  msg.Type + 1,
+	}
+	rsr := &ScriptRunRequest{}
+	reply.Error = rsc.UnmarshalMessage(msg, rsr)
+	if reply.Error != nil {
+		return reply
+	}
+
+	script := rsr.Script
+	if script == nil {
+		rsc.lock.Lock()
+		script = rsc.cfg.Scripts[rsr.ScriptId]
+		rsc.lock.Unlock()
+	}
+	if script == nil {
+		reply.Error = &bus.Error{
+			Code:        int32(bus.CommonErrorCode_INVALID_TYPE),
+			UserMessage: proto.String("invalid script ID"),
+		}
+		return reply
+	}
+
+	if reply.Error = rsc.runScript(rsr.Target, script); reply.Error != nil {
+		return reply
+	}
+	rsc.MarshalMessage(reply, &ScriptRunResponse{})
+
+	return reply
+}
+
+func (rsc *RoscOLD) runScript(targetID int32, script *Script) *bus.Error {
+	rsc.Log.Debug("running script",
+		"target_id", targetID,
+		"script_name", script.Name,
+	)
+	for _, action := range script.Actions {
+		switch action.Type {
+		case ScriptActionType_ActionTypeSet:
+			if busErr := rsc.sendMessage(targetID, action); busErr != nil {
+				return busErr
+			}
+		case ScriptActionType_ActionTypeFade:
+			rsc.fade(targetID, action)
+		case ScriptActionType_ActionTypeSleep:
+			time.Sleep(time.Millisecond * time.Duration(action.DurationMs))
+		}
+	}
+	return nil
+}
+
+type messageable interface {
+	GetAddress() string
+	GetValues() []*svc.OSCValue
+}
+
+func (rsc *RoscOLD) sendMessage(targetID int32, msgble messageable) *bus.Error {
+	rsc.lock.Lock()
+	client := rsc.clients[targetID]
+	rsc.lock.Unlock()
+	if client == nil {
+		rsc.Log.Error("invalid target", "target_id", targetID)
+		return &bus.Error{
+			Code:   int32(bus.CommonErrorCode_INVALID_TYPE),
+			Detail: proto.String(fmt.Sprintf("invalid target: %d", targetID)),
+		}
+	}
+
+	oscMsg := osc.NewMessage(msgble.GetAddress())
+	for _, oscVal := range msgble.GetValues() {
+		var value any
+		switch v := oscVal.Value.(type) {
+		case *OSCValue_Nil:
+			// value nil is desired
+		case *OSCValue_Int32:
+			value = v.Int32
+		case *OSCValue_Float32:
+			value = v.Float32
+		case *OSCValue_String_:
+			value = v.String_
+		case *OSCValue_Blob:
+			value = v.Blob
+		case *OSCValue_Int64:
+			value = v.Int64
+		/*
+			case *OSCValue_Time:
+				value = v.Time
+			case *OSCValue_Double:
+				value = v.Double
+		*/
+		case *OSCValue_True:
+			value = true
+		case *OSCValue_False:
+			value = false
+		}
+		oscMsg.Append(value)
+	}
+	if err := client.Send(oscMsg); err != nil {
+		rsc.Log.Error("sending osc",
+			"host", client.IP(),
+			"port", client.Port(),
+			"osc", *oscMsg,
+			"error", err.Error(),
+		)
+		return &bus.Error{
+			Code:   int32(bus.CommonErrorCode_UNKNOWN),
+			Detail: proto.String("sending: " + err.Error()),
+		}
+	}
+	return nil
+}
+
+func (rsc *RoscOLD) fade(targetID int32, action *ScriptAction) *bus.Error {
+	if len(action.Values) < 2 {
+		return nil
+	}
+	from := action.Values[0].Value.(*OSCValue_Float32).Float32
+	to := action.Values[1].Value.(*OSCValue_Float32).Float32
+	duration := time.Millisecond * time.Duration(action.DurationMs)
+	timeSlice := duration / 60
+	delta := (to - from) / float32(duration/timeSlice)
+	cmp := func(a, b float32) bool {
+		return a <= b
+	}
+	if delta < 0 {
+		cmp = func(a, b float32) bool {
+			return a >= b
+		}
+	}
+	for v := from; cmp(v, to); v += delta {
+		sa := &ScriptAction{
+			Address: action.Address,
+			Type:    ScriptActionType_ActionTypeSet,
+			Values: []*OSCValue{
+				{Value: &OSCValue_Float32{Float32: v}},
+			},
+		}
+		if busErr := rsc.sendMessage(targetID, sa); busErr != nil {
+			return busErr
+		}
+		time.Sleep(timeSlice)
+	}
+
+	return nil
+}

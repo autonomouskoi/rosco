@@ -1,18 +1,21 @@
 import * as roscopb from '/m/rosco/pb/rosco_pb.js';
-import { Controller, TargetsMap } from "./controller.js";
+import { OSCTargetSelect } from '/tk.js';
+import { Controller } from "./controller.js";
 
 class Sender extends HTMLElement {
     private _ctrl: Controller;
     private _button_send: HTMLButtonElement;
     private _input_address: HTMLInputElement;
     private _input_value: HTMLInputElement;
-    private _select_target: HTMLSelectElement;
+    private _select_target: OSCTargetSelect;
     private _select_type: HTMLSelectElement;
 
     constructor(ctrl: Controller) {
         super();
-        this.attachShadow({ mode: 'open' });
-        this.shadowRoot.innerHTML = `
+        let targetTitle = 'Target to send OSC test messages to during test runs';
+        let addressTitle = 'Address (variable) for OSC values';
+
+        this.innerHTML = `
 <style>
 #fields-grid {
     display: grid;
@@ -21,18 +24,17 @@ class Sender extends HTMLElement {
 }
 </style>
 <fieldset>
-<legend>Send</legend>
+<legend>Send Test Message</legend>
 
 <div id="fields-grid">
-    <label for="select-target">Target</label>
-    <select id="select-target"></select>
+    <label for="select-target" title="${targetTitle}">Target</label>
 
-    <label for="input-address">Address</label>
-    <input type="text" id="input-address"
+    <label for="input-address" title="${addressTitle}">Address</label>
+    <input type="text" id="input-address" title="${addressTitle}"
         placeholder="/osc/foo"
     />
 
-    <select id="select-type">
+    <select id="select-type" title="value type">
         <option>Nil</option>
         <option>int32</option>
         <option>float32</option>
@@ -44,37 +46,31 @@ class Sender extends HTMLElement {
         <option>true</option>
         <option>false</option>
     </select>
-    <input type="text" id="input-value" />
+    <input type="text" id="input-value" title="value to send" />
 
-    <button id="btn-send">Send</button>
+    <button id="btn-send" type="button">Send</button>
 </div>
 
 </select>
 </fieldset>
 `;
         this._ctrl = ctrl;
-        this._button_send = this.shadowRoot.querySelector('#btn-send');
+        this._button_send = this.querySelector('#btn-send');
         this._button_send.addEventListener('click', () => this._send());
-        this._input_address = this.shadowRoot.querySelector('#input-address');
-        this._input_value = this.shadowRoot.querySelector('#input-value');
-        this._select_target = this.shadowRoot.querySelector('#select-target');
-        this._select_type = this.shadowRoot.querySelector('#select-type');
+        this._input_address = this.querySelector('#input-address');
+        this._input_value = this.querySelector('#input-value');
+        this._select_type = this.querySelector('#select-type');
 
-        this._ctrl.targets.subscribe((targets) => this._updateTargets(targets));
-        this._select_target.addEventListener('change', (s) => {
-            this._ctrl.testTarget.update(parseInt(this._select_target.value));
-        });
+        this._select_target = new OSCTargetSelect();
+        this._select_target.id = 'select-target';
+        this._select_target.title = targetTitle;
+        this._select_target.addEventListener('input', () => this._targetUpdate());
+        this._select_target.ready.then(() => this._targetUpdate());
+        this.querySelector('label[for="select-target"]').after(this._select_target);
     }
 
-    private _updateTargets(targets: TargetsMap) {
-        this._select_target.textContent = '';
-        for (let idStr of Object.keys(targets)) {
-            let option = document.createElement('option');
-            option.value = idStr;
-            let id = parseInt(idStr);
-            option.innerText = targets[id].name;
-            this._select_target.appendChild(option);
-        }
+    private _targetUpdate() {
+        this._ctrl.testTarget = this._select_target.value;
     }
 
     private _send() {
@@ -94,7 +90,7 @@ class Sender extends HTMLElement {
                 value.value = { case: 'string', value: inputValue };
                 break;
             case 'blob':
-                value.value = { case: 'blob', value: new TextEncoder().encode(inputValue)};
+                value.value = { case: 'blob', value: new TextEncoder().encode(inputValue) };
                 break;
             case 'int64':
                 value.value = { case: 'int64', value: BigInt(inputValue) };

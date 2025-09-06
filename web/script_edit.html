@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link href="/main.css" rel="stylesheet">
+    <link href="/titillium.css" rel="stylesheet">
+    <title>Rosco: Script Editor</title>
+</head>
+
+<body>
+    <div id="blocklyArea" style="height: 100vh"></div>
+    <div id="blocklyDiv" style="position: absolute"></div>
+</body>
+<script type="importmap">
+        {
+            "imports": {
+                "@bufbuild/protobuf": "/protobuf/index.js",
+                "blockly": "./blockly.js"
+            }
+        }
+    </script>
+<script src="./blockly_compressed.js"></script>
+<script src="./blocks_compressed.js"></script>
+<script src="./en.js"></script>
+<script type="module">
+    import { ScriptEditor } from "./bscript.js";
+    import { Controller } from "./controller.js";
+
+    let ctrl = new Controller();
+    ctrl.ready().then(() => {
+        let blocklyDiv = document.querySelector('#blocklyDiv');
+        new ScriptEditor(blocklyDiv);
+    });
+</script>
+
+</html>

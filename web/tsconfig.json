@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+        "lib": [
+            "DOM",
+            "ESNext"
+        ],
+        "module": "Node16",
+        "moduleResolution": "node16",
+        "noImplicitAny": true,
+        "outDir": "out/",
+        "paths": {
+            "/m/rosco/pb/*": [
+                "./out/pb/*"
+            ],
+            "/m/rosco/*": [
+                "./out/*"
+            ],
+            "/*": [
+                "../../akcore/web/content/out/*"
+            ]
+        },
+        "target": "ESNext"
+    },
+    "include": [
+        "*ts",
+    ],
+}

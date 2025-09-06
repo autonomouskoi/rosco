@@ -3,6 +3,9 @@ import * as roscopb from '/m/rosco/pb/rosco_pb.js';
 import * as input from './input.js';
 import { GloballyStyledHTMLElement } from '/global-styles.js';
 
+const EVENT_RUN = 'roscoscriptrun';
+const EVENT_UPDATE = 'roscoscriptupdate';
+
 interface scriptActionEdit {
     elements(): HTMLElement[];
     getAction(): roscopb.ScriptAction;
@@ -27,9 +30,9 @@ class ScriptActionEditSleep {
         sa.durationMs = this._duration.value;
         return sa;
     }
-    
+
     valid(): boolean {
-        return this._duration.valid(); 
+        return this._duration.valid();
     }
 }
 
@@ -99,7 +102,7 @@ class ScriptActionEditFade {
         let sa = new roscopb.ScriptAction();
         sa.type = roscopb.ScriptActionType.ActionTypeFade;
         sa.address = this._address.value;
-        sa.values.push(this._from.value) 
+        sa.values.push(this._from.value)
         sa.values.push(this._to.value);
         sa.durationMs = this._duration.value;
         return sa;
@@ -124,7 +127,7 @@ class ScriptActionEdit extends GloballyStyledHTMLElement {
     private _scriptAction: scriptActionEdit;
     private _action = new roscopb.ScriptAction();
 
-    onSave = (action: roscopb.ScriptAction) => {};
+    onSave = (action: roscopb.ScriptAction) => { };
 
     constructor() {
         super();
@@ -226,7 +229,7 @@ table {
     <th></th>
 </tr>
 `;
-        actions.map((action) => this._createRow(action)) 
+        actions.map((action) => this._createRow(action))
             .forEach((row) => table.appendChild(row));
     }
 
@@ -329,4 +332,4 @@ class ScriptEdit extends HTMLElement {
     }
 }
 
-export { ScriptEdit };
+export { EVENT_RUN, EVENT_UPDATE, ScriptEdit };

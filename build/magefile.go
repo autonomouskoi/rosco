@@ -16,6 +16,7 @@ import (
 var (
 	baseDir string
 	webDir  string
+	nodeDir string
 )
 
 var Default = All
@@ -28,6 +29,7 @@ func init() {
 	}
 	baseDir = filepath.Join(baseDir, "..")
 	webDir = filepath.Join(baseDir, "web")
+	nodeDir = filepath.Join(webDir, "node_modules")
 }
 
 func Clean() error {
@@ -62,7 +64,7 @@ func GoProtos() error {
 
 func TSProtos() error {
 	mg.Deps(WebDir)
-	return mageutil.TSProtosInDir(webDir, baseDir, filepath.Join(baseDir, "node_modules"))
+	return mageutil.TSProtosInDir(webDir, baseDir, nodeDir)
 }
 
 func TS() error {
@@ -81,6 +83,15 @@ func WebSrcCopy() error {
 	if err := mageutil.CopyInDir(webDir, baseDir, filenames...); err != nil {
 		return fmt.Errorf("copying: %w", err)
 	}
+	blocklyDir := filepath.Join(webDir, "blockly")
+	if err := mageutil.Mkdir(blocklyDir); err != nil {
+		return fmt.Errorf("creating %s: %w", blocklyDir, err)
+	}
+	blocklyIn := filepath.Join(nodeDir, "blockly")
+	if err := mageutil.CopyInDir(blocklyDir, blocklyIn, "blockly_compress.js", "blocks_compress.js", "en.js"); err != nil {
+		return fmt.Errorf("copying: %w", err)
+	}
+
 	return nil
 }
 
