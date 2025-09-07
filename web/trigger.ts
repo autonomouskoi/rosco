@@ -3,7 +3,13 @@ import { Controller } from './controller.js';
 import { OSCTargetSelect, UpdatingControlPanel } from '/tk.js';
 
 let help = document.createElement('div');
-help.innerHTML = `HALP`;
+help.innerHTML = `
+<p>
+Triggers which provide a mechanism to manually run a script against a specific target. For each 
+trigger Rosco will provide a button you can click to activate it and a link you can use in tools 
+like Stream Deck to activate it with a custom button.
+</p>
+`;
 
 class Triggers extends UpdatingControlPanel<roscopb.Config> {
     private _table: HTMLDivElement;
