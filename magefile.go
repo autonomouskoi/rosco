@@ -173,11 +173,6 @@ func Manifest() error {
 				Type:        modules.ManifestWebPathType_MANIFEST_WEB_PATH_TYPE_EMBED_CONTROL,
 				Description: "Controls for Rosco",
 			},
-			{
-				Path:        "/m/rosco/index.html",
-				Type:        modules.ManifestWebPathType_MANIFEST_WEB_PATH_TYPE_CONTROL_PAGE,
-				Description: "Script Editor",
-			},
 		},
 	}
 	manifest, err := protojson.Marshal(manifestPB)
